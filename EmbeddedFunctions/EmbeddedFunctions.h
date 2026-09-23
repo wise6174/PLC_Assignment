@@ -55,5 +55,6 @@ public:
 	String^ GCommand(String^ command) { return ""; }
 
 private:
-	// Add any additional member variables and functions as required
+	TcpClient^ client;
+	NetworkStream^ stream;
 };
