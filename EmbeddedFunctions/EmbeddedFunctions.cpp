@@ -64,6 +64,37 @@ void EmbeddedFunctions::GClose() {
 */
 // TODO: complete this function.
 String^ EmbeddedFunctions::GCommand(String^ command) { 
+	if (stream == nullptr) {
+		throw gcnew System::Exception("Connection is not open. Call GOpen() first.");
+	}
 
-	return ""; 
+	try {
+		// Append a semicolon if the command does not already end with one
+		if (!command->EndsWith(";")) {
+			command += ";";
+		}
+
+		// Galil controllers require a carriage return (\r) to execute TCP commands
+		String^ commandToSend = command + "\r";
+
+		// Convert the command string to an ASCII byte array
+		array^ sendBytes = System::Text::Encoding::ASCII->GetBytes(commandToSend);
+
+		// Send the command over the TCP stream
+		stream->Write(sendBytes, 0, sendBytes->Length);
+
+		// Prepare a buffer to read the incoming response
+		array^ readBuffer = gcnew array(1024);
+
+		// Read the response from the controller
+		int bytesRead = stream->Read(readBuffer, 0, readBuffer->Length);
+
+		// Convert the received bytes back into a String
+		String^ response = System::Text::Encoding::ASCII->GetString(readBuffer, 0, bytesRead);
+
+		return response;
+	}
+	catch (System::Exception^ exception) {
+		throw gcnew System::Exception("Error executing GCommand: " + exception->Message);
+	}
 }
