@@ -16,7 +16,14 @@ int main(void) {
 
 		newval =  myGalil.DigitalInput();
 
-		myGalil.AnalogOutput(1, 5.2);
+		myGalil.AnalogOutput(0, 5.2);
+
+		myGalil.WriteEncoder();
+		myGalil.setSetPoint(30);
+		myGalil.setKp(2);
+		myGalil.setKi(3);
+		myGalil.SpeedControl(true, 1);
+
 
 		std::cout << newval;
 

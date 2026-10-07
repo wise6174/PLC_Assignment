@@ -248,7 +248,7 @@
 	// Read from motor Encoder (encoder channel 0)
 	int Galil::ReadEncoder() {
 		char response[64];
-		std::string command = "MG TPA";
+		std::string command = "QE 0";
 		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
 
 		if (rc != G_NO_ERROR) {
@@ -304,13 +304,10 @@
 	// The loop will run using the PID values specified in the data of this object, and has an
 	// automatic timeout of 10s. You do NOT need to implement this function, it is defined in
 	// GalilControl.lib
-	//void Galil::PositionControl(bool debug, int Motorchannel) {
-
-	//};
-	//// same as above. Setpoint interpreted as counts per second
-	//void Galil::SpeedControl(bool debug, int Motorchannel) {
-
-	//};
+	//void Galil::PositionControl(bool debug, int Motorchannel) {};
+	
+	// same as above. Setpoint interpreted as counts per second
+	//void Galil::SpeedControl(bool debug, int Motorchannel) {};
 
 
 	//// OPERATOR OVERLOADS
