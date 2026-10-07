@@ -162,7 +162,6 @@
 	bool Galil::DigitalBitInput(uint8_t bit) {
 		char response[32];
 
-		// Query the specific bit index provided by the user
 		std::string command = "MG @IN[" + std::to_string(bit) + "]";
 
 		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
@@ -172,8 +171,6 @@
 		}
 
 		try {
-			// Parse the numerical response ("1.0000" or "0.0000")
-			// Checking if it equals 1 safely returns true for HIGH and false for LOW
 			return static_cast<uint8_t>(std::stod(response)) == 1;
 		}
 		catch (const std::exception&) {
@@ -181,61 +178,139 @@
 		}
 	}					
 
-	//// TODO: complete this function.
-	//bool CheckSuccessfulWrite();							// Check the string response from the Galil to check that the last
-	//														// command executed correctly. 1 = succesful.
-	//														// A successful write indicates that a write command (sending a 
-	//														// message to the Galil that does not have a response -- e.g., 
-	//														// digitalOutput, analogOutput) has completed without errors.
-	//														// This should validate some part of the Galil's response (it is 
-	//														// up to you how this is completed) but should validly
-	//														// differentiate when a write command has been completed 
-	//														// successfully.
-	//														// This will be called from your main function (do not call it
-	//														// within your implementation functions of this Galil class.
+	// Check the string response from the Galil to check that the last
+	// command executed correctly. 1 = succesful.
+	// A successful write indicates that a write command (sending a 
+	// message to the Galil that does not have a response -- e.g., 
+	// digitalOutput, analogOutput) has completed without errors.
+	// This should validate some part of the Galil's response (it is 
+	// up to you how this is completed) but should validly
+	// differentiate when a write command has been completed 
+	// successfully.
+	// This will be called from your main function (do not call it
+	// within your implementation functions of this Galil class.
+	bool Galil::CheckSuccessfulWrite() {
+		return false;
+	};
 
-	//// ANALOG FUNCITONS
-	//// TODO: complete this function.
-	//float AnalogInput(uint8_t channel);						// Read Analog channel and return voltage			
-	//// TODO: complete this function.
-	//void AnalogOutput(uint8_t channel, double voltage);		// Write to any channel of the Galil, send voltages as
-	//														// 2 decimal place in the command string
-	//// TODO: complete this function.
-	//void AnalogInputRange(uint8_t channel, uint8_t range);	// Configure the range of the input channel with
-	//														// the desired range code
+	// ANALOG FUNCITONS
+	// Read Analog channel and return voltage			
+	float Galil::AnalogInput(uint8_t channel) {
+		char response[64];
+		std::string command = "MG @AN[" + std::to_string(channel) + "]";
 
-	//// ENCODER
-	//// TODO: complete this function.
-	//void WriteEncoder();									// Manually Set the motor encoder value to zero (encoder channel 0)
-	//// TODO: complete this function.
-	//int ReadEncoder();										// Read from motor Encoder (encoder channel 0)
+		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
 
-	//// CONTROL FUNCTIONS
-	//// TODO: complete this function.
-	//void setSetPoint(int s);								// Set the desired setpoint for control loops, counts or counts/sec
-	//														// This should set it within the class not on the actual Galil.
-	//// TODO: complete this function.
-	//double getSetPoint();									// Gets the current setpoint stored in the class
-	//// TODO: complete this function.
-	//void setKp(double gain);								// Set the proportional gain of the controller used in controlLoop() of Position/SpeedControl
-	//														// This should set it within the class not on the actual Galil.
-	//// TODO: complete this function.
-	//double getKp();											// Gets the current proportional gain stored in the class
-	//// TODO: complete this function.
-	//void setKi(double gain);								// Set the integral gain of the controller used in controlLoop()  of Position/SpeedControl
-	//														// This should set it within the class not on the actual Galil.
-	//// TODO: complete this function.
-	//double getKi();											// Gets the current integral gain stored in the class
-	//// TODO: complete this function.
-	//void setKd(double gain);								// Set the derivative gain of the controller used in controlLoop()  of Position/SpeedControl
-	//														// This should set it within the class not on the actual Galil.
-	//// TODO: complete this function.
-	//double getKd();											// Gets the current derivative gain stored in the class
-	//void PositionControl(bool debug, int Motorchannel);		// Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.
-	//														// The loop will run using the PID values specified in the data of this object, and has an 
-	//														// automatic timeout of 10s. You do NOT need to implement this function, it is defined in
-	//														// GalilControl.lib
-	//void SpeedControl(bool debug, int Motorchannel);		// same as above. Setpoint interpreted as counts per second
+		if (rc != G_NO_ERROR) {
+			throw std::runtime_error("Failed to read @AN[" + std::to_string(channel) + "] with code: " + std::to_string(rc));
+		}
+
+		try {
+			return std::stof(response);
+		}
+		catch (const std::exception&) {
+			throw std::runtime_error(std::string("Failed to parse @AN response: ") + response);
+		}
+	};
+	
+	// Write to any channel of the Galil, send voltages as
+	// 2 decimal place in the command string
+	void Galil::AnalogOutput(uint8_t channel, double voltage) {
+		char response[64];
+		std::string command = "AO " + std::to_string(channel) + "," + std::to_string(voltage);
+
+		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+
+		if (rc != G_NO_ERROR) {
+			throw std::runtime_error("AnalogOutput failed: " + std::to_string(rc));
+		}
+	};
+
+	// Configure the range of the input channel with
+	// the desired range code
+	void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {
+
+	};
+														
+
+	// ENCODER
+	// Manually Set the motor encoder value to zero (encoder channel 0)
+	void Galil::WriteEncoder() {
+		char response[64];
+		std::string command = "WE 0";
+		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+
+		if (rc != G_NO_ERROR) {
+			throw std::runtime_error("WriteEncoder failed: " + std::to_string(rc));
+		}
+	};
+								
+	// Read from motor Encoder (encoder channel 0)
+	int Galil::ReadEncoder() {
+		char response[64];
+		std::string command = "MG TPA";
+		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+
+		if (rc != G_NO_ERROR) {
+			throw std::runtime_error("ReadEncoder failed: " + std::to_string(rc));
+		}
+		return std::stoi(response);
+	};
+
+	// CONTROL FUNCTIONS
+	// Set the desired setpoint for control loops, counts or counts/sec
+	// // This should set it within the class not on the actual Galil.
+	void Galil::setSetPoint(int s) {
+		setPoint = s;
+	};
+	
+	// Gets the current setpoint stored in the class
+	double Galil::getSetPoint() {
+		return setPoint;
+	};
+
+	// Set the proportional gain of the controller used in controlLoop() of Position/SpeedControl
+	// This should set it within the class not on the actual Galil.
+	void Galil::setKp(double gain) {
+		ControlParameters[0] = gain;
+	};
+													
+	// Gets the current proportional gain stored in the class
+	double Galil::getKp() {
+		return ControlParameters[0];
+	};
+										
+	// Set the integral gain of the controller used in controlLoop()  of Position/SpeedControl
+	// This should set it within the class not on the actual Galil.
+	void Galil::setKi(double gain) {
+		ControlParameters[1] = gain;
+	};
+													
+	// Gets the current integral gain stored in the class
+	double Galil::getKi() {
+		return ControlParameters[1];
+	};
+
+	// Set the derivative gain of the controller used in controlLoop()  of Position/SpeedControl
+	// This should set it within the class not on the actual Galil.
+	void Galil::setKd(double gain) {
+		ControlParameters[2] = gain;
+	};
+	// Gets the current derivative gain stored in the class
+	double Galil::getKd() {
+		return ControlParameters[2];
+	};
+	// Run the control loop. ReadEncoder() is the input to the loop. The motor is the output.	
+	// The loop will run using the PID values specified in the data of this object, and has an
+	// automatic timeout of 10s. You do NOT need to implement this function, it is defined in
+	// GalilControl.lib
+	//void Galil::PositionControl(bool debug, int Motorchannel) {
+
+	//};
+	//// same as above. Setpoint interpreted as counts per second
+	//void Galil::SpeedControl(bool debug, int Motorchannel) {
+
+	//};
 
 
 	//// OPERATOR OVERLOADS
