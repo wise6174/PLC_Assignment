@@ -24,7 +24,8 @@
     };	
 	/* Constructor with EmbeddedFunciton pre-initialised and passed in
 	*/
-	Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address)  : Functions(Funcs), g(0), ControlParameters{ 0.0, 0.0, 0.0 }, setPoint(0), savedAddress(address) {
+	Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address)  : g(0), ControlParameters{ 0.0, 0.0, 0.0 }, setPoint(0), savedAddress(address) {
+		Functions = new EmbeddedFunctions(*Funcs);
 		const GReturn rc = Functions->GOpen(address, &g);
 		if (rc != G_NO_ERROR) {
 			delete Functions;
@@ -63,10 +64,10 @@
 		if (Functions != nullptr && g != 0) {
 			Functions->GClose(g);
 		}
-		/*if (Functions != nullptr) {
+		if (Functions != nullptr) {
 			delete Functions;
 			Functions = nullptr;
-		}*/
+		}
 	};												
 
 	// DIGITAL OUTPUTS
@@ -352,7 +353,6 @@
 		}
 
 		this->Functions = new EmbeddedFunctions(*(other.Functions));
-
 		this->savedAddress = other.savedAddress;
 
 		const GReturn rc = this->Functions->GOpen(this->savedAddress.c_str(), &this->g);
