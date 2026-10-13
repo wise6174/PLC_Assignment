@@ -20,16 +20,20 @@ EmbeddedFunctions::~EmbeddedFunctions() {
 *
 * @throws error if one occurs.
 */
-// TODO: complete this function.
 void EmbeddedFunctions::GOpen(String^ address, const int port) {
 	try {
-		client = gcnew TcpClient(address, port);
-		stream = client->GetStream();
-		client->ReceiveTimeout = 5000;
-		client->SendTimeout = 5000;
+		client = gcnew TcpClient(address, port); 
+
+		client->SendBufferSize = 64; 
+		client->ReceiveBufferSize = 2048; 
+		client->SendTimeout = 500; 
+		client->ReceiveTimeout = 500; 
+		client->NoDelay = true; 
+
+		stream = client->GetStream(); 
 	}
 	catch (System::Exception^ exception) {
-		throw gcnew System::Exception("Failed to open TCP connection: " + exception->Message);
+		throw gcnew System::Exception("GOpen Error: " + exception->Message);
 	};
 }
 
@@ -40,15 +44,21 @@ void EmbeddedFunctions::GOpen(String^ address, const int port) {
 *
 * @throws error if one occurs.
 */
-// TODO: complete this function.
 void EmbeddedFunctions::GClose() {
-	if (stream != nullptr) {
-		stream->Close();
-		stream = nullptr;
+	try {
+		if (stream != nullptr) {
+			stream->Close();
+			stream = nullptr;
+		}
+		if (client != nullptr) {
+			client->Close();
+			client = nullptr;
+		}
 	}
-	if (client != nullptr) {
-		client->Close();
+	catch (System::Exception^ exception) {
+		stream = nullptr;
 		client = nullptr;
+		throw gcnew System::Exception("GClose Error: " + exception->Message);
 	}
 }
 
@@ -62,10 +72,9 @@ void EmbeddedFunctions::GClose() {
 * @return The reponse from the Galil.
 * @throws error if one occurs.
 */
-// TODO: complete this function.
-String^ EmbeddedFunctions::GCommand(String^ command) { 
+String^ EmbeddedFunctions::GCommand(String^ command) {
 	if (stream == nullptr) {
-		throw gcnew System::Exception("Connection is not open. Call GOpen() first.");
+		throw gcnew System::Exception("Connection is not open");
 	}
 
 	try {
@@ -75,19 +84,22 @@ String^ EmbeddedFunctions::GCommand(String^ command) {
 
 		String^ commandToSend = command + "\r";
 
-		array<System::Byte>^ sendBytes = System::Text::Encoding::ASCII->GetBytes(commandToSend);
+		array<uint8_t>^ SendData = gcnew array<uint8_t>(64);
+		array<uint8_t>^ RecvData = gcnew array<uint8_t>(2048);
 
-		stream->Write(sendBytes, 0, sendBytes->Length);
+		// Send Data
+		SendData = Encoding::ASCII->GetBytes(commandToSend);
+		stream->Write(SendData, 0, SendData->Length);
+		Threading::Thread::Sleep(10);
 
-		array<System::Byte>^ readBuffer = gcnew array<System::Byte>(1024);
-
-		int bytesRead = stream->Read(readBuffer, 0, readBuffer->Length);
-
-		String^ response = System::Text::Encoding::ASCII->GetString(readBuffer, 0, bytesRead);
+		// Read Data
+		stream->Read(RecvData, 0, RecvData->Length);
+		Threading::Thread::Sleep(25);
+		String^ response = Encoding::ASCII->GetString(RecvData);
 
 		return response;
 	}
 	catch (System::Exception^ exception) {
-		throw gcnew System::Exception("Error executing GCommand: " + exception->Message);
+		throw gcnew System::Exception("GCommand Error: " + exception->Message + " Command: " + command);
 	}
-}
+};
