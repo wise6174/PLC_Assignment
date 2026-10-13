@@ -10,21 +10,21 @@
 	* Should assign a default embedded functions that works with physical hardware and a
 	* default Galil address as described in the assignment spec.
 	*/
-	Galil::Galil() : Functions(nullptr), g(0), ControlParameters{ 0.0, 0.0, 0.0 }, setPoint(0) {
+	Galil::Galil() : Functions(nullptr), g(0), ControlParameters{ 0.0, 0.0, 0.0 }, setPoint(0), savedAddress("192.168.0.120") {
 		Functions = new EmbeddedFunctions();
 
 		const GCStringIn addr = "192.168.0.120 -d";
 		const GReturn rc = Functions->GOpen(addr, &g);
 		if (rc != G_NO_ERROR) {
-			delete Functions;
-			Functions = nullptr;
+			/*delete Functions;
+			Functions = nullptr;*/
 			throw std::runtime_error(std::string("GOpen failed for default address '") +
 				"192.168.0.120 -d" + "' - Code: " + std::to_string(rc));
 		}
     };	
 	/* Constructor with EmbeddedFunciton pre-initialised and passed in
 	*/
-	Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address)  : Functions(Funcs), g(0), ControlParameters{ 0.0, 0.0, 0.0 }, setPoint(0) {
+	Galil::Galil(EmbeddedFunctions* Funcs, GCStringIn address)  : Functions(Funcs), g(0), ControlParameters{ 0.0, 0.0, 0.0 }, setPoint(0), savedAddress(address) {
 		const GReturn rc = Functions->GOpen(address, &g);
 		if (rc != G_NO_ERROR) {
 			delete Functions;
@@ -40,11 +40,14 @@
 	*/
 	Galil::Galil(const Galil& other) : g(0), setPoint(other.setPoint) {
 		Functions = new EmbeddedFunctions(*(other.Functions));
+
 		for (int i = 0; i < 3; ++i) {
 			ControlParameters[i] = other.ControlParameters[i];
 		}
-		const GCStringIn address = "192.168.0.120 -d";
-		const GReturn rc = Functions->GOpen(address, &g);
+
+		savedAddress = other.savedAddress;
+
+		const GReturn rc = Functions->GOpen(savedAddress.c_str(), &g);
 		if (rc != G_NO_ERROR) {
 			delete Functions;
 			Functions = nullptr;
@@ -60,6 +63,10 @@
 		if (Functions != nullptr && g != 0) {
 			Functions->GClose(g);
 		}
+		/*if (Functions != nullptr) {
+			delete Functions;
+			Functions = nullptr;
+		}*/
 	};												
 
 	// DIGITAL OUTPUTS
@@ -67,9 +74,7 @@
 	void Galil::DigitalOutput(uint16_t value) {
 		std::string command = "OP " + std::to_string(value);
 
-		char response[32];
-
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("DigitalOutput failed: " + std::to_string(rc));
@@ -81,8 +86,6 @@
 	void Galil::DigitalByteOutput(bool bank, uint8_t value) {
 		int offset = (bank == 0) ? 0 : 8;
 
-		char response[32];
-
 		for (int i = 0; i < 8; ++i) {
 			int bit_index = offset + i;
 
@@ -90,7 +93,7 @@
 
 			std::string command = (is_high ? "SB " : "CB ") + std::to_string(bit_index);
 
-			GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+			GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 			if (rc != G_NO_ERROR) {
 				throw std::runtime_error("DigitalByteOutput failed: " + command + " with code: " + std::to_string(rc));
@@ -99,11 +102,9 @@
 	}
 	//// Write single bit to digital outputs. 'bit' specifies which bit
 	void Galil::DigitalBitOutput(bool val, uint8_t bit) {
-		char response[32];
-
 		std::string command = (val ? "SB " : "CB ") + std::to_string(bit);
 
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("DigitalBitOutput failed: " + std::to_string(bit) + " with code: " + std::to_string(rc));
@@ -116,25 +117,23 @@
 	// Query the digital inputs of the GALIL, See Galil command library @IN
 	uint16_t Galil::DigitalInput() {
 		uint16_t result = 0;
-		char response[64];
-
 		for (int i = 0; i <= 15; ++i) {
 			std::string command = "MG @IN[" + std::to_string(i) + "]";
 
-			GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+			GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 			if (rc != G_NO_ERROR) {
 				throw std::runtime_error("Failed to read @IN[" + std::to_string(i) + "] with code: " + std::to_string(rc));
 			}
 
 			try {
-				uint16_t bit_val = static_cast<uint16_t>(std::stod(response));
+				uint16_t bit_val = static_cast<uint16_t>(std::stod(prevResponse));
 				if (bit_val == 1) {
 					result |= (1 << (i));
 				}
 			}
 			catch (const std::exception&) {
-				throw std::runtime_error(std::string("Failed to parse @IN response: ") + response);
+				throw std::runtime_error(std::string("Failed to parse @IN response: ") + prevResponse);
 			}
 		}
 
@@ -160,21 +159,19 @@
 	// Read single bit from current digital inputs. Above functions
 	// may use this function
 	bool Galil::DigitalBitInput(uint8_t bit) {
-		char response[32];
-
 		std::string command = "MG @IN[" + std::to_string(bit) + "]";
 
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("Failed to read @IN[" + std::to_string(bit) + "] with code: " + std::to_string(rc));
 		}
 
 		try {
-			return static_cast<uint8_t>(std::stod(response)) == 1;
+			return static_cast<uint8_t>(std::stod(prevResponse)) == 1;
 		}
 		catch (const std::exception&) {
-			throw std::runtime_error(std::string("Failed to parse @IN response: ") + response);
+			throw std::runtime_error(std::string("Failed to parse @IN response: ") + prevResponse);
 		}
 	}					
 
@@ -190,36 +187,40 @@
 	// This will be called from your main function (do not call it
 	// within your implementation functions of this Galil class.
 	bool Galil::CheckSuccessfulWrite() {
-		return false;
+		std::string response_str(prevResponse);
+
+		if (response_str.find('?') != std::string::npos) {
+			return false; 
+		}
+
+		return true;
 	};
 
 	// ANALOG FUNCITONS
 	// Read Analog channel and return voltage			
 	float Galil::AnalogInput(uint8_t channel) {
-		char response[64];
 		std::string command = "MG @AN[" + std::to_string(channel) + "]";
 
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("Failed to read @AN[" + std::to_string(channel) + "] with code: " + std::to_string(rc));
 		}
 
 		try {
-			return std::stof(response);
+			return std::stof(prevResponse);
 		}
 		catch (const std::exception&) {
-			throw std::runtime_error(std::string("Failed to parse @AN response: ") + response);
+			throw std::runtime_error(std::string("Failed to parse @AN response: ") + prevResponse);
 		}
 	};
 	
 	// Write to any channel of the Galil, send voltages as
 	// 2 decimal place in the command string
 	void Galil::AnalogOutput(uint8_t channel, double voltage) {
-		char response[64];
 		std::string command = "AO " + std::to_string(channel) + "," + std::to_string(voltage);
 
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("AnalogOutput failed: " + std::to_string(rc));
@@ -229,16 +230,21 @@
 	// Configure the range of the input channel with
 	// the desired range code
 	void Galil::AnalogInputRange(uint8_t channel, uint8_t range) {
+		std::string command = "AQ " + std::to_string(channel) + "," + std::to_string(range);
 
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
+
+		if (rc != G_NO_ERROR) {
+			throw std::runtime_error("AnalogInputRange failed: " + std::to_string(rc));
+		}
 	};
 														
 
 	// ENCODER
 	// Manually Set the motor encoder value to zero (encoder channel 0)
 	void Galil::WriteEncoder() {
-		char response[64];
 		std::string command = "WE 0";
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("WriteEncoder failed: " + std::to_string(rc));
@@ -247,14 +253,13 @@
 								
 	// Read from motor Encoder (encoder channel 0)
 	int Galil::ReadEncoder() {
-		char response[64];
 		std::string command = "QE 0";
-		GReturn rc = Functions->GCommand(g, command.c_str(), response, sizeof(response), nullptr);
+		GReturn rc = Functions->GCommand(g, command.c_str(), prevResponse, sizeof(prevResponse), nullptr);
 
 		if (rc != G_NO_ERROR) {
 			throw std::runtime_error("ReadEncoder failed: " + std::to_string(rc));
 		}
-		return std::stoi(response);
+		return std::stoi(prevResponse);
 	};
 
 	// CONTROL FUNCTIONS
@@ -262,10 +267,12 @@
 	// // This should set it within the class not on the actual Galil.
 	void Galil::setSetPoint(int s) {
 		setPoint = s;
+		std::cout << setPoint << std::endl;
 	};
 	
 	// Gets the current setpoint stored in the class
 	double Galil::getSetPoint() {
+		std::cout << setPoint << std::endl;
 		return setPoint;
 	};
 
@@ -311,10 +318,52 @@
 
 
 	//// OPERATOR OVERLOADS
-	//// TODO: complete this function.
-	//friend std::ostream& operator<<(std::ostream& output, Galil& galil);	// Operator overload for '<<' operator. So the user can say cout << Galil;
-	//																		// This function should print out the output of GInfo and GVersion, with
-	//																		// two newLines after each.
-	//Galil& operator=(const Galil& other);									// Copy assignment operator. This acts in the same way as the copy constructor
-	//																		// (refer above for details).
+	// Operator overload for '<<' operator. So the user can say cout << Galil;
+	// This function should print out the output of GInfo and GVersion, with
+	// two newLines after each.
+	std::ostream& operator<<(std::ostream& output, Galil& galil) {
+		char info[256] = "";
+		char version[256] = "";
+		galil.Functions->GInfo(galil.g, info, sizeof(info));
+		galil.Functions->GVersion(version, sizeof(version));
+		output << info << "\n\n";
+		output << version << "\n\n";
+
+		return output;
+	};	
+	
+	// Copy assignment operator. This acts in the same way as the copy constructor
+	// // (refer above for details).
+	Galil& Galil::operator=(const Galil& other) {
+		if (this == &other) {
+			return *this;
+		}
+
+		this->setPoint = other.setPoint;
+		for (int i = 0; i < 3; ++i) {
+			this->ControlParameters[i] = other.ControlParameters[i];
+		}
+
+		if (this->g) {
+			this->Functions->GClose(this->g);
+		}
+		if (this->Functions) {
+			delete this->Functions;
+		}
+
+		this->Functions = new EmbeddedFunctions(*(other.Functions));
+
+		this->savedAddress = other.savedAddress;
+
+		const GReturn rc = this->Functions->GOpen(this->savedAddress.c_str(), &this->g);
+		if (rc != G_NO_ERROR) {
+			delete this->Functions;
+			this->Functions = nullptr;
+			throw std::runtime_error(std::string("Copy Assignment failed") +
+				" - Code: " + std::to_string(rc));
+		}
+
+		return *this;
+	};
+	//																		
 	
