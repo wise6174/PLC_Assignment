@@ -9,9 +9,12 @@ This class should implement Galil interractions using TCP communications. It can
 Implement the EmbeddedFunctions class within EmbeddedFunctions.cpp. Test this class using the provided main function in EFMain.cpp.
 */
 
+#include <cstdint>
+
 #using <System.dll>
 using namespace System;
 using namespace System::Net::Sockets;
+using namespace System::Text;
 
 ref class EmbeddedFunctions {
 public:
