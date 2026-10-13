@@ -134,4 +134,6 @@ protected:
 	int setPoint;					// Control Setpoint
 
 	// TODO: Add any new data members or functions BELOW (DO NOT ADD THEM ABOVE THIS LINE)
+	std::string savedAddress;
+	char prevResponse[128] = "";
 };
