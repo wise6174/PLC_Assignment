@@ -1,136 +1,80 @@
-//#include "Galil.h"
-//
-//int main(void) {
-//	try {
-//		EmbeddedFunctions funcs(true);
-//		Galil myGalil(&funcs, "192.168.0.120 -d");
-//
-//		std::cout << myGalil;
-//
-//		myGalil.WriteEncoder();
-//		std::cout << "Encoder: " << myGalil.ReadEncoder() << std::endl;
-//
-//		uint16_t value = 255;
-//		myGalil.DigitalOutput(value);
-//
-//		uint16_t newval = myGalil.DigitalInput();
-//		myGalil.DigitalByteOutput(false, 3);
-//
-//		newval = myGalil.DigitalInput();
-//		myGalil.DigitalBitOutput(true, 13);
-//
-//		newval =  myGalil.DigitalInput();
-//
-//		myGalil.AnalogOutput(0, 5.2);
-//
-//		myGalil.WriteEncoder();
-//
-//		int setpoint = 13;
-//		std::cout << myGalil.getSetPoint() << std::endl;
-//		myGalil.setSetPoint(setpoint);
-//		std::cout << myGalil.getSetPoint() << std::endl;
-//		myGalil.setKp(2);
-//		myGalil.setKi(3);
-//		myGalil.SpeedControl(true, 1);
-//
-//		myGalil.AnalogOutput(0, 0);
-//		myGalil.AnalogOutput(0, 0.0);
-//		myGalil.AnalogOutput(1, 0.0);
-//		myGalil.AnalogOutput(2, 0.0);
-//		myGalil.DigitalOutput(0);
-//
-//		myGalil.WriteEncoder();
-//
-//		std::cout << newval;
-//
-//		std::cout << "Command sent successfully.\n";
-//	}
-//	catch (const std::exception& e) {
-//		std::cerr << "Fatal Error: " << e.what() << '\n';
-//	}
-//
-//	std::cin.get(); 
-//
-//	return 0;
-// }
-
 #include "Galil.h"
+
+#include <cmath>
+#include <cstdio>
 #include <iostream>
+#include <string>
+#include <chrono>
+#include <thread>
+using namespace std::chrono_literals;
 
-int main() {
-	try {
-		// 1. Initialize Connection
-		EmbeddedFunctions funcs(true);
-		Galil myGalil(&funcs, "192.168.0.120 -d");
+#using <System.dll>	
+using namespace System;
+using namespace System::Threading;
 
-		std::cout << "--- Testing Operator Overload ---\n";
-		std::cout << myGalil;
+/**
+ * Hints for completing this task
+ *  - Use std::this_thread::sleep_for(100ms) to sleep for 100 ms (C++ Syntax)
+ *  - Use Threading::Thread::Sleep(100) to sleep for 100 ms (CLR Syntax)
+ *	- Use std::stoi to convert string to an integer (C++ Syntax)
+ *		Signature: int stoi(const std::string& str, size_t* pos = nullptr, int base = 10);
+ *  - Use Convert::ToInt32 to convert string to an integer (CLR Syntax)
+ *		Signature: int Convert::ToInt32(String^ str);
+ *  - You might find std::min and std::max useful
+ */
 
-		// 2. Test Encoder
-		std::cout << "--- Testing Encoder ---\n";
-		myGalil.WriteEncoder();
-		std::cout << "Encoder Initialized to: " << myGalil.ReadEncoder() << "\n\n";
 
-		// 3. Test Digital I/O
-		std::cout << "--- Testing Digital I/O ---\n";
-		myGalil.DigitalOutput(255);
-		uint16_t newval = myGalil.DigitalInput();
-		std::cout << "Input after 16-bit Output: " << newval << '\n';
+int main(void) {
+	EmbeddedFunctions func;
+	Galil g(&func, "192.168.0.120 -d");
 
-		myGalil.DigitalByteOutput(false, 3);
-		newval = myGalil.DigitalInput();
-		std::cout << "Input after Byte Output:   " << newval << '\n';
+	/* Your Code Here ... */
+	g.DigitalOutput(0);
+	//4,7,2
+	float V_AIN = 0.0;
+	int d = 0;
+	int digitCounter = 0;
+	int correctCounter = 0;
+	while (!Console::KeyAvailable && digitCounter < 3) {
+		V_AIN = g.AnalogInput(0);
 
-		myGalil.DigitalBitOutput(true, 13);
-		newval = myGalil.DigitalInput();
-		std::cout << "Input after Bit Output:    " << newval << "\n\n";
-
-		// 4. Test Analog I/O
-		std::cout << "--- Testing Analog I/O ---\n";
-		myGalil.AnalogOutput(0, 5.2);
-		std::cout << "Analog Channel 0 set to 5.2V\n\n";
-		myGalil.AnalogOutput(0, 0);
-		std::cout << "Encoder currently at " << myGalil.ReadEncoder() << "\n\n";
-
-		// 5. Test Control Loop
-		std::cout << "--- Testing Control Loop ---\n";
-		//myGalil.WriteEncoder(); // Reset encoder for a clean loop
-
-		int setpoint = 500;
-		std::cout << "Initial SetPoint: " << myGalil.getSetPoint() << '\n';
-
-		myGalil.setSetPoint(setpoint);
-		std::cout << "Updated SetPoint: " << myGalil.getSetPoint() << '\n';
-
-		myGalil.setKp(0.0005);
-		myGalil.setKi(0.0);
-		myGalil.setKd(0.0);
-
-		std::cout << "Executing Position Control...\n";
-		myGalil.PositionControl(true, 0);
-
-		// 6. Cleanup & Reset hardware states
-		std::cout << "\n--- Resetting Simulator States ---\n";
-		myGalil.AnalogOutput(0, 0.0);
-		myGalil.AnalogOutput(1, 0.0);
-		myGalil.AnalogOutput(2, 0.0);
-		myGalil.DigitalOutput(0);
-
-		double currEncoder = myGalil.ReadEncoder();
-		while (abs(myGalil.ReadEncoder() - currEncoder) > 0) {
-			currEncoder = myGalil.ReadEncoder();
+		d = floor(Convert::ToInt32(V_AIN));
+		if (d > 9) {
+			d = 9;
 		}
-		myGalil.WriteEncoder();
-		
-
-		std::cout << "\nAll commands executed successfully.\n";
+		g.DigitalByteOutput(0, d);
+		if (d == 4 && digitCounter == 0) {
+			correctCounter++;
+		}
+		else if (d == 7 && digitCounter == 1) {
+			correctCounter++;
+		}
+		else if (d == 2 && digitCounter == 2) {
+			correctCounter++;
+		}
+		digitCounter++;
+		int digit = g.DigitalByteInput(0);
+		g.DigitalByteOutput(1, digitCounter);
 	}
-	catch (const std::exception& e) {
-		std::cerr << "\nFatal Error: " << e.what() << '\n';
+	if (correctCounter == 3) {
+		std::cout << "UNLOCKED" << std::endl;
+		int i = 0;
+		while (i<3) {
+			g.DigitalOutput(15);
+			g.DigitalOutput(0);
+			Threading::Thread::Sleep(500);
+			i++;
+		}
 	}
+	else {
+		std::cout<< "WRONG" << std::endl;
+		g.DigitalOutput(0);
+		g.AnalogOutput(0, 3);
+		Threading::Thread::Sleep(500);
+		g.AnalogOutput(0, 0);
+	}
+	
 
-	std::cout << "Press Enter to exit...";
-	std::cin.get();
-
+	/* End User Code */
 	return 0;
 }
